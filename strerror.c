@@ -57,7 +57,7 @@ static size_t usbi_locale = 0;
  * </ol>
  */
 
-static const char* usbi_locale_supported[] = { "en", "nl", "fr", "ru" };
+static const char* usbi_locale_supported[] = { "en", "ru" };
 static const char* usbi_localized_errors[ARRAYSIZE(usbi_locale_supported)][LIBUSB_ERROR_COUNT] = {
 	{ /* English (en) */
 		"Success",
@@ -74,37 +74,7 @@ static const char* usbi_localized_errors[ARRAYSIZE(usbi_locale_supported)][LIBUS
 		"Insufficient memory",
 		"Operation not supported or unimplemented on this platform",
 		"Other error",
-	}, { /* Dutch (nl) */
-		"Gelukt",
-		"Invoer-/uitvoerfout",
-		"Ongeldig argument",
-		"Toegang geweigerd (onvoldoende toegangsrechten)",
-		"Apparaat bestaat niet (verbinding met apparaat verbroken?)",
-		"Niet gevonden",
-		"Apparaat of hulpbron is bezig",
-		"Bewerking verlopen",
-		"Waarde is te groot",
-		"Gebroken pijp",
-		"Onderbroken systeemaanroep",
-		"Onvoldoende geheugen beschikbaar",
-		"Bewerking wordt niet ondersteund",
-		"Andere fout",
-	}, { /* French (fr) */
-		"Succès",
-		"Erreur d'entrée/sortie",
-		"Paramètre invalide",
-		"Accès refusé (permissions insuffisantes)",
-		"Périphérique introuvable (peut-être déconnecté)",
-		"Elément introuvable",
-		"Resource déjà occupée",
-		"Operation expirée",
-		"Débordement",
-		"Erreur de pipe",
-		"Appel système abandonné (peut-être à cause d’un signal)",
-		"Mémoire insuffisante",
-		"Opération non supportée or non implémentée sur cette plateforme",
-		"Autre erreur",
-	}, { /* Russian (ru) */
+    }, { /* Russian (ru) */
 		"Успех",
 		"Ошибка ввода/вывода",
 		"Неверный параметр",
