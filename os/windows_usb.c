@@ -3222,16 +3222,18 @@ static int winusbx_abort_transfers(int sub_api, struct usbi_transfer *itransfer)
 	if (!WinUSBX[sub_api].AbortPipe(winusb_handle, transfer->endpoint)) {
 		usbi_err(ctx, "AbortPipe failed: %s", windows_error_str(0));
 
+        libusb_lock_events(ctx);
         usbi_mutex_lock(&ctx->flying_transfers_lock);
 
-        libusb_lock_events(ctx);
 
-        usbi_remove_pollfd(ctx, transfer_priv->pollable_fd.fd);
+
+        usbi_remove_pollfd(ctx, transfer_priv->pollable_fd.fd);        
         list_del(&itransfer->list);
 
-        libusb_unlock_events(ctx);
 
         usbi_mutex_unlock(&ctx->flying_transfers_lock);
+
+        libusb_unlock_events(ctx);
 
 
 		return LIBUSB_ERROR_NO_DEVICE;
