@@ -3222,7 +3222,9 @@ static int winusbx_abort_transfers(int sub_api, struct usbi_transfer *itransfer)
 	if (!WinUSBX[sub_api].AbortPipe(winusb_handle, transfer->endpoint)) {
 		usbi_err(ctx, "AbortPipe failed: %s", windows_error_str(0));
 
+
         libusb_lock_events(ctx);
+        usbi_mutex_lock(&ctx->open_devs_lock);
         usbi_mutex_lock(&ctx->flying_transfers_lock);
 
 
@@ -3232,6 +3234,7 @@ static int winusbx_abort_transfers(int sub_api, struct usbi_transfer *itransfer)
 
 
         usbi_mutex_unlock(&ctx->flying_transfers_lock);
+        usbi_mutex_unlock(&ctx->open_devs_lock);
 
         libusb_unlock_events(ctx);
 
