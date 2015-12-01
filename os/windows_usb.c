@@ -3057,6 +3057,9 @@ static int winusbx_submit_control_transfer(int sub_api, struct usbi_transfer *it
 		wfd.overlapped->Internal = STATUS_COMPLETED_SYNCHRONOUSLY;
 		wfd.overlapped->InternalHigh = 0;
 	} else {
+        ULONG timeout = 0;
+        WinUSBX[sub_api].SetPipePolicy(wfd.handle, 0,  PIPE_TRANSFER_TIMEOUT,
+                                       sizeof(ULONG), &timeout);
 		if (!WinUSBX[sub_api].ControlTransfer(wfd.handle, *setup, transfer->buffer + LIBUSB_CONTROL_SETUP_SIZE, size, NULL, wfd.overlapped)) {
 			if(GetLastError() != ERROR_IO_PENDING) {
 				usbi_warn(ctx, "ControlTransfer failed: %s", windows_error_str(0));
