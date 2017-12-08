@@ -75,12 +75,18 @@ struct {
 	// Additional variables for XP CancelIoEx partial emulation
 	HANDLE original_handle;
 	DWORD thread_id;
+    HANDLE waitEvent;
 } _poll_fd[MAX_FDS];
 
 // globals
 BOOLEAN is_polling_set = FALSE;
 LONG pipe_number = 0;
 static volatile LONG compat_spinlock = 0;
+static HANDLE wait_event;
+
+static VOID CALLBACK cb_wait_event(PVOID lpParameter, BOOLEAN TimerOrWaitFired) {
+    SetEvent(wait_event);
+}
 
 #if !defined(_WIN32_WCE)
 // CancelIoEx, available on Vista and later only, provides the ability to cancel
@@ -164,10 +170,14 @@ void init_polling(void)
 			_poll_fd[i].original_handle = INVALID_HANDLE_VALUE;
 			_poll_fd[i].thread_id = 0;
 			InitializeCriticalSection(&_poll_fd[i].mutex);
+            _poll_fd[i].waitEvent = INVALID_HANDLE_VALUE;
 		}
-		is_polling_set = TRUE;
+
+        wait_event = CreateEvent(NULL, TRUE, FALSE, NULL);
+		is_polling_set = TRUE;        
 	}
 	InterlockedExchange((LONG *)&compat_spinlock, 0);
+
 }
 
 // Internal function to retrieve the table index (and lock the fd mutex)
@@ -384,6 +394,9 @@ struct winfd usbi_create_fd(HANDLE handle, int access_mode, struct usbi_transfer
 
 static void _free_index(int _index)
 {
+
+
+
 	// Cancel any async IO (Don't care about the validity of our handles for this)
 	cancel_io(_index);
 	// close the duplicate handle (if we have an actual duplicate)
@@ -394,6 +407,12 @@ static void _free_index(int _index)
 		_poll_fd[_index].original_handle = INVALID_HANDLE_VALUE;
 		_poll_fd[_index].thread_id = 0;
 	}
+
+    if (_poll_fd[_index].waitEvent != INVALID_HANDLE_VALUE) {
+        UnregisterWait(_poll_fd[_index].waitEvent);
+        _poll_fd[_index].waitEvent = INVALID_HANDLE_VALUE;
+    }
+
 	free_overlapped(poll_fd[_index].overlapped);
 	poll_fd[_index] = INVALID_WINFD;
 }
@@ -578,6 +597,17 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 			fds[i].revents = fds[i].events;
 			triggered++;
 		} else {
+            if (_poll_fd[_index].waitEvent == INVALID_HANDLE_VALUE) {
+                if (!RegisterWaitForSingleObject(&_poll_fd[_index].waitEvent,
+                                                poll_fd[_index].overlapped->hEvent,
+                                                cb_wait_event,
+                                                NULL, INFINITE, WT_EXECUTEONLYONCE)) {
+                    LeaveCriticalSection(&_poll_fd[_index].mutex);
+                    triggered = -1;
+                    goto poll_exit;
+                }
+            }
+
 			handles_to_wait_on[nb_handles_to_wait_on] = poll_fd[_index].overlapped->hEvent;
 			handle_to_index[nb_handles_to_wait_on] = i;
 			nb_handles_to_wait_on++;
@@ -590,26 +620,34 @@ int usbi_poll(struct pollfd *fds, unsigned int nfds, int timeout)
 		if (timeout < 0) {
 			poll_dbg("starting infinite wait for %d handles...", (int)nb_handles_to_wait_on);
 		} else {
-			poll_dbg("starting %d ms wait for %d handles...", timeout, (int)nb_handles_to_wait_on);
+            poll_dbg("starting %d ms wait for %d handles...", timeout, (int)nb_handles_to_wait_on);
 		}
-		ret = WaitForMultipleObjects(nb_handles_to_wait_on, handles_to_wait_on,
-			FALSE, (timeout<0)?INFINITE:(DWORD)timeout);
-		object_index = ret-WAIT_OBJECT_0;
-		if ((object_index >= 0) && ((DWORD)object_index < nb_handles_to_wait_on)) {
-			poll_dbg("  completed after wait");
-			i = handle_to_index[object_index];
-			_index = _fd_to_index_and_lock(fds[i].fd);
-			fds[i].revents = fds[i].events;
-			triggered++;
-			if (_index >= 0) {
-				LeaveCriticalSection(&_poll_fd[_index].mutex);
-			}
-		} else if (ret == WAIT_TIMEOUT) {
+
+        if ((ret = WaitForSingleObject(wait_event, timeout)) == WAIT_OBJECT_0) {
+            ResetEvent(wait_event);
+            for (object_index = 0; object_index < (int)nb_handles_to_wait_on; object_index++) {
+                if (WaitForSingleObject(handles_to_wait_on[object_index], 0) == WAIT_OBJECT_0) {
+
+                    i = handle_to_index[object_index];
+                    _index = _fd_to_index_and_lock(fds[i].fd);
+                    fds[i].revents = fds[i].events;
+                    UnregisterWait(_poll_fd[_index].waitEvent);
+                    _poll_fd[_index].waitEvent = INVALID_HANDLE_VALUE;
+
+                    triggered++;
+                    if (_index >= 0) {
+                        LeaveCriticalSection(&_poll_fd[_index].mutex);
+                    }
+                }
+            }
+        } else if (ret == WAIT_TIMEOUT) {
 			poll_dbg("  timed out");
-			triggered = 0;	// 0 = timeout
+            //triggered = 0;	// 0 = timeout
 		} else {
+            DWORD err = GetLastError();
 			errno = EIO;
 			triggered = -1;	// error
+            poll_dbg("err = 0x%08X", err);
 		}
 	}
 

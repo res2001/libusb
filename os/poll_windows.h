@@ -55,7 +55,7 @@ enum windows_version {
 };
 extern int windows_version;
 
-#define MAX_FDS     256
+#define MAX_FDS     (256*32)
 
 #define POLLIN      0x0001    /* There is data to read */
 #define POLLPRI     0x0002    /* There is urgent data to read */

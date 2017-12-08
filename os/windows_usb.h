@@ -63,7 +63,7 @@ extern char *_strdup(const char *strSource);
 #define MAX_PATH_LENGTH             128
 #define MAX_KEY_LENGTH              256
 #define LIST_SEPARATOR              ';'
-#define HTAB_SIZE                   1021
+#define HTAB_SIZE                   (32*1021)
 
 // Handle code for HID interface that have been claimed ("dibs")
 #define INTERFACE_CLAIMED           ((HANDLE)(intptr_t)0xD1B5)
