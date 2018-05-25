@@ -32,6 +32,11 @@ set(LIBUSB_HEADERS
 
 
 if(WIN32)
+    include(CheckStructHasMember)
+    check_struct_has_member("struct timespec" tv_sec time.h HAVE_STRUCT_TIMESPEC LANGUAGE C)
+    if(HAVE_STRUCT_TIMESPEC)
+        add_definitions(-DHAVE_STRUCT_TIMESPEC)
+    endif(HAVE_STRUCT_TIMESPEC)
     set(SOURCES ${SOURCES}
         ${LIBUSB_DIR}/os/poll_windows.c
         ${LIBUSB_DIR}/os/threads_windows.c
